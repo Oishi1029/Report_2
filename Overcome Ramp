@@ -1,0 +1,469 @@
+// LIBRARY //                                       
+#include <LiquidCrystal.h>
+#include "NewPing.h"
+#include<Wire.h>
+
+// ENCODER //
+const byte interruptPin = 19;
+volatile byte state = LOW;
+volatile unsigned int counter =0;
+const int circumference = 21;
+int initialCounter=0;
+
+// MPU6050 //
+float RateRoll, RatePitch, RateYaw;
+float AccX, AccY, AccZ;
+float inclineAngle, AnglePitch;
+float LoopTimer;
+double upAngle=0.0;
+int initialTime;
+
+// LCD Keypad Shield //
+const int rs = 8, en = 9, d4 = 4, d5 = 5, d6 = 6, d7 = 7;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+
+// INFRARED RAY SENSOR//
+int IRcounter;
+int IR1 = 49; 
+int IR2 = 45;  
+
+// L298N Driver // 
+int EnA = 12;
+int EnB = 11;
+int In2 = 52;
+int In1 = 26;
+int In4 = 36;
+int In3 = 32;
+
+// FLAG // 
+int flagEncoder=1;
+int flagBoost=1;
+int obstacleOnce=1;
+int boostOnce=1;
+int spinFlag = 1;
+int rampFlag = 1;
+int distanceFlag=1;
+int travel_10cm_Flag = 1;
+
+////////////////////////////////////FUNCTIONS DECLARATION//////////////////////////////////////////////////////////
+void setup();
+
+// Calculate counter // 
+void blink();
+
+// MPU6050 //
+void gyro_signals(void);
+
+// MOTOR //
+void forward();
+void speedForward();
+void turnRight();
+void turnLeft();
+void stop();
+void boost();
+void backward();
+void rampTurnLeft();
+void rampTurnRight();
+void rampForwardDown();
+void spin360();
+
+// MOTOR + SENSOR //
+void beforeUpRamp();
+void upRamp();
+void downRamp();
+void travel_10cm();
+void followLineOnly();
+
+// LCD PRINT //
+void lcd_print_Distance_Time(int initialTime);
+void lcd_print_Angle();
+
+// HC-SR04 //
+void HC_SR04();
+
+//////////////////////////////////////////////LOOP////////////////////////////////////////////////////////////////////
+
+void loop() { // This program will run continuously.
+  //MPU//
+  gyro_signals();
+
+  if (spinFlag==1){ //lcd prints angle before vehicle complete 360 turn 
+    lcd.clear();
+    if (inclineAngle > upAngle) upAngle=inclineAngle;
+    lcd_print_Angle(); 
+
+  if (spinFlag==0){ //lcd prints distance and time after conquering ramp
+    lcd.clear();
+    initialTime = millis();
+    lcd_print_Distance_Time(initialTime);
+  }
+
+  if (obstacleOnce==1 || spinFlag==1){ //enters this loop if vehicle havent go up ramp and havent 360 turn
+    if (flagBoost==1 && obstacleOnce == 1){ //speed forward for one time 
+      speedForward(); //motor forward with increased speed
+      delay(300);
+      flagBoost=0;
+    }
+  
+    else if (inclineAngle >= -9.0 && inclineAngle <= 9.0 && flagBoost==0 && obstacleOnce == 1){ //normal angle but with increased forward speed 
+      beforeUpRamp(); //follow line with increased forward speed 
+    }
+
+    else if (inclineAngle > 9.0 && flagBoost==0 && obstacleOnce == 1){ //incline upward and lcd.print the maximum angle
+      upRamp(); //line follow up ramp with boost speed
+      obstacleOnce=0; // indicates already ascend the ramp
+      if (inclineAngle > upAngle) upAngle=inclineAngle; //determine the maximum ramp inclination angle
+    }
+
+    else if (inclineAngle >= -9.0 && inclineAngle <= 9.0 && flagBoost==0 && obstacleOnce == 0){ //spin 360 on top of the ramp
+      stop();
+      delay(4000);
+      spin360(); //spin 360 degree
+      delay(2400);
+      spinFlag=0; //indicates the vehicle completed 360 spin, quits current 'if' block
+    }
+  }
+
+  else if (spinFlag==0 && rampFlag ==1){ //after spin 360, forward on normal angle, break out of the loop when ramp inclines down
+    boost();
+    delay(100);
+    downRamp(); //do gown ramp using 'for' loop with predetermined time
+    rampFlag=0; //indicates the ramp task have been done, quits current 'if' block
+  }
+
+      
+  else if (rampFlag==0 && distanceFlag ==1){ // this loop excuted when ramp is on incline downward ramp angle
+    stop();
+    delay(1000); //stop for 1 seconds to indiciate vehicle about to travel 10 cm
+    initialCounter = counter;
+    travel_10cm(initialCounter); // function that uses while loop to travel 10cm using counter variable
+    stop();
+    delay(2000); //stop for 2 seconds according to task 
+    boost(); 
+    delay(10); //boost for 0.01 seconds 
+    distanceFlag=0; //this flag indicates the 10cm task is done, quits current 'if' block
+  }
+
+  else followLineOnly(); //after ramp and 10cm task, follow line until the end
+
+  return (0);
+}
+
+
+
+/////////////////////////////////////////////FUNCTIONS CONTENT////////////////////////////////////////////////////
+
+void setup() {                 
+  // Initialize the pins as inputs and outputs.
+  pinMode(EnA, OUTPUT);
+  pinMode(EnB, OUTPUT); 
+
+  pinMode(In1, OUTPUT);
+  pinMode(In2, OUTPUT);
+  pinMode(In3, OUTPUT);
+  pinMode(In4, OUTPUT);
+
+  pinMode(IR1, INPUT);
+  pinMode(IR2, INPUT);
+
+  pinMode(trigPin,OUTPUT);
+  pinMode(echoPin,INPUT);
+
+  //MPU6050
+  pinMode(13, OUTPUT);
+  digitalWrite(13, HIGH);
+  Wire.setClock(400000);
+  Wire.begin();
+  delay(250);
+  Wire.beginTransmission(0x68); 
+  Wire.write(0x6B);
+  Wire.write(0x00);
+  Wire.endTransmission();
+
+  pinMode(interruptPin, INPUT);
+  attachInterrupt(digitalPinToInterrupt(interruptPin), blink, CHANGE);
+
+  Serial.begin(9600);
+  lcd.begin(16, 2);
+
+}
+
+void blink() {
+  counter++;
+}
+
+void gyro_signals(void) {
+  Wire.beginTransmission(0x68);
+  Wire.write(0x1A);
+  Wire.write(0x05);
+  Wire.endTransmission();
+  Wire.beginTransmission(0x68);
+  Wire.write(0x1C);
+  Wire.write(0x10);
+  Wire.endTransmission();
+  Wire.beginTransmission(0x68);
+  Wire.write(0x3B);
+  Wire.endTransmission(); 
+  Wire.requestFrom(0x68,6);
+  int16_t AccXLSB = Wire.read() << 8 | Wire.read();
+  int16_t AccYLSB = Wire.read() << 8 | Wire.read();
+  int16_t AccZLSB = Wire.read() << 8 | Wire.read();
+  Wire.beginTransmission(0x68);
+  Wire.write(0x1B); 
+  Wire.write(0x8);
+  Wire.endTransmission();                                                   
+  Wire.beginTransmission(0x68);
+  Wire.write(0x43);
+  Wire.endTransmission();
+  Wire.requestFrom(0x68,6);
+  int16_t GyroX=Wire.read()<<8 | Wire.read();
+  int16_t GyroY=Wire.read()<<8 | Wire.read();
+  int16_t GyroZ=Wire.read()<<8 | Wire.read();
+  RateRoll=(float)GyroX/65.5;
+  RatePitch=(float)GyroY/65.5;
+  RateYaw=(float)GyroZ/65.5;
+  AccX=(float)AccXLSB/4096;
+  AccY=(float)AccYLSB/4096;
+  AccZ=(float)AccZLSB/4096;
+  inclineAngle=atan(AccY/sqrt(AccX*AccX+AccZ*AccZ))*1/(3.142/180);
+  AnglePitch=-atan(AccX/sqrt(AccY*AccY+AccZ*AccZ))*1/(3.142/180);
+}
+
+void forward(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 60);  
+  analogWrite(EnB, 60);  
+}
+
+void speedForward(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 90);   
+  analogWrite(EnB, 90);  
+}
+
+void turnRight(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, HIGH);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 155);
+  analogWrite(EnB, 155);
+}
+
+void turnLeft(){
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, HIGH);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 155);
+  analogWrite(EnB, 155);
+}
+
+void stop(){
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 0);
+  analogWrite(EnB, 0);
+}
+
+void boost(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 215);   
+  analogWrite(EnB, 215);   
+}
+
+void backward(){
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, HIGH);
+  digitalWrite(In3, HIGH);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 255); 
+  analogWrite(EnB, 255); 
+}
+
+void rampTurnLeft(){
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, HIGH);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 150);
+  analogWrite(EnB, 150);
+}
+
+void rampTurnRight(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, HIGH);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 150);
+  analogWrite(EnB, 150);
+}
+
+void rampForwardDown(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 40);   
+  analogWrite(EnB, 40);  
+}
+
+void spin360(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, HIGH);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 255);
+  analogWrite(EnB, 0);
+}
+
+void lcd_print_Distance_Time(int initialTime){
+  lcd.setCursor(0, 0);
+  lcd.print("Time:");
+  lcd.print(millis()/1000);
+  lcd.print(" s");
+  lcd.setCursor(0, 1);
+  lcd.print("Distance:");
+  lcd.print((int)((counter/20 * circumference)/3.8));
+  lcd.print("cm"); 
+}
+
+void lcd_print_Angle(){
+  lcd.setCursor(0, 0);
+  lcd.print("Angle:");
+  lcd.print(upAngle);
+  lcd.print(" deg");
+}
+
+void HC_SR04(){
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+}
+
+void beforeUpRamp(){
+  if (digitalRead(IR1)==LOW && digitalRead(IR2)==LOW){
+   
+    stop();
+  } 
+
+  else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==HIGH){ 
+    speedForward();
+  }
+
+  else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==LOW){
+    turnRight();
+    delay(50);
+  }
+
+  else if (digitalRead(IR1)==LOW && digitalRead(IR2)==HIGH){
+    turnLeft();
+    delay(50);
+  }
+}
+
+void upRamp(){
+  if (digitalRead(IR1)==LOW && digitalRead(IR2)==LOW){  
+    forward();
+  }
+
+  else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==HIGH){ 
+    boost();
+  }
+
+  else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==LOW){
+    
+    rampTurnRight();
+    delay(50);
+  }
+
+  else if (digitalRead(IR1)==LOW && digitalRead(IR2)==HIGH){
+    
+    rampTurnLeft();
+    delay(50);
+  }
+  if (inclineAngle > upAngle) upAngle=inclineAngle;
+}
+
+void downRamp(){
+  for (int t=0; t <= 2300; t++){
+    if (digitalRead(IR1)==LOW && digitalRead(IR2)==LOW){ 
+      forward();
+    }
+    else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==HIGH){ 
+      forward();
+    } 
+
+    else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==LOW){
+      rampTurnRight();
+      delay(50);
+    }
+
+    else if (digitalRead(IR1)==LOW && digitalRead(IR2)==HIGH){
+      rampTurnLeft();
+      delay(50);
+    }
+    delay(1);
+  }
+}
+
+void travel_10cm(int initialCounter){
+  boost();
+  delay(6);
+  while (counter < (initialCounter + 50)){
+    if (digitalRead(IR1)==LOW && digitalRead(IR2)==LOW){  
+      stop();
+    } 
+
+    else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==HIGH){ 
+      forward();
+    }
+
+    else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==LOW){
+      turnRight();
+      delay(50);
+    }
+
+    else if (digitalRead(IR1)==LOW && digitalRead(IR2)==HIGH){
+      turnLeft();
+      delay(50);
+    }
+    lcd_print_Distance_Time(initialTime);
+  }
+}
+
+void followLineOnly(){
+  if (digitalRead(IR1)==LOW && digitalRead(IR2)==LOW){  //IR will not light up
+    stop();
+  }
+
+  else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==HIGH){ //IR not on black line
+    forward();
+  }
+
+  else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==LOW){
+    turnRight();
+    delay(50);
+  }
+
+  else if (digitalRead(IR1)==LOW && digitalRead(IR2)==HIGH){
+    turnLeft();
+    delay(50);
+  }
+}
+
+
