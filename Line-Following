@@ -1,0 +1,111 @@
+int EnA = 12;
+int EnB = 11;
+
+int In2 = 52;
+int In1 = 26;
+int In4 = 36;
+int In3 = 32;
+
+int IR1 = 49; 
+int IR2 = 45;  
+
+
+int flagBoost=1;
+
+=====================
+void forward();
+void turnRight();
+void turnLeft();
+void stop();
+void boost();
+=====================
+
+void setup() {                
+  
+  pinMode(EnA, OUTPUT);
+  pinMode(EnB, OUTPUT); 
+
+  pinMode(In1, OUTPUT);
+  pinMode(In2, OUTPUT);
+  pinMode(In3, OUTPUT);
+  pinMode(In4, OUTPUT);
+
+  pinMode(IR1, INPUT);
+  pinMode(IR2, INPUT);
+
+}
+
+void loop() { 
+
+  if (flagBoost==1){ //boost after turning on power supply to allow vehicle to overcome the surface friction when not moving initially
+    boost();
+    delay(100);
+    flagBoost=0;
+  }
+
+  else if (digitalRead(IR1)==LOW && digitalRead(IR2)==LOW){  //stop when both IR detects black surface 
+    stop();
+  }
+
+  else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==HIGH){ //move forward when both IR detects white surface
+    forward();
+  }
+
+  else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==LOW){ //turn right when left IR detects white while right IR detects black surface
+    turnRight();
+    delay(50);
+  }
+
+  else if (digitalRead(IR1)==LOW && digitalRead(IR2)==HIGH){ //turn left when left IR detects black while right IR detects white surface
+    turnLeft();
+    delay(50);
+  }
+  
+  return (0);
+}
+
+void forward(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 65);   
+  analogWrite(EnB, 65);   
+}
+void turnRight(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, HIGH);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 140);
+  analogWrite(EnB, 140);
+}
+
+void turnLeft(){
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, HIGH);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 140);
+  analogWrite(EnB, 140);
+}
+
+void stop(){
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 0);
+  analogWrite(EnB, 0);
+}
+
+void boost(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 215);   
+  analogWrite(EnB, 215);   
+}
+
+
