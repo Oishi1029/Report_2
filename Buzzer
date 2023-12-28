@@ -1,0 +1,110 @@
+int buzzerPin = 53;
+
+int EnA = 12;
+int EnB = 11;
+
+int In2 = 52;
+int In1 = 26;
+int In4 = 36;
+int In3 = 32;
+
+int IR1 = 49; 
+int IR2 = 45; 
+
+==================
+void forward();
+void turnRight();
+void turnLeft();
+void stop();
+==================
+
+void setup()
+{ 
+  pinMode(buzzerPin,OUTPUT);
+
+  pinMode(EnA, OUTPUT);
+  pinMode(EnB, OUTPUT); 
+
+  pinMode(In1, OUTPUT);
+  pinMode(In2, OUTPUT);
+  pinMode(In3, OUTPUT);
+  pinMode(In4, OUTPUT);
+
+  pinMode(IR1, INPUT);
+  pinMode(IR2, INPUT);
+
+  boost();
+  delay(300);
+
+}
+ 
+void loop()
+{
+  if (digitalRead(IR1)==LOW && digitalRead(IR2)==LOW) {
+    stop();
+    digitalWrite(buzzerPin,LOW);
+  }
+  else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==HIGH) {
+    forward(); 
+    digitalWrite(buzzerPin,LOW);
+  }
+    
+  else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==LOW){
+    turnRight();
+    digitalWrite(buzzerPin,HIGH);
+    delay(50);
+  }
+
+  else if (digitalRead(IR1)==LOW && digitalRead(IR2)==HIGH){
+    turnLeft();
+    digitalWrite(buzzerPin,HIGH);
+    delay(50);
+  }
+}
+
+void forward(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 65);   
+  analogWrite(EnB, 65);   
+}
+
+void turnRight(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, HIGH);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 200);
+  analogWrite(EnB, 200);
+}
+
+void turnLeft(){
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, HIGH);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 200);
+  analogWrite(EnB, 200);
+}
+
+void stop(){
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 0);
+  analogWrite(EnB, 0);
+}
+
+void boost(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 165);   
+  analogWrite(EnB, 165);   
+}
+
+
