@@ -1,0 +1,101 @@
+char Incoming_value = 0;
+
+// L298N Driver // 
+int EnA = 12;
+int EnB = 11;
+int In2 = 52;
+int In1 = 26;
+int In4 = 36;
+int In3 = 32;
+
+////////// function declaration//////////
+void setup();
+void forward();
+void turnLeft();
+void turnRight();
+void backward();
+void stop();
+void boost();
+/////////////////////////////////////////
+
+void loop(){
+  if(Serial.available() > 0) { //checks if there is signal read or not 
+    Incoming_value = Serial.read();      
+    //Serial.print(Incoming_value);        
+    //Serial.print("\n");        
+    if(Incoming_value == '1') forward();
+    else if(Incoming_value == '2') turnLeft();
+    else if(Incoming_value == '3') backward();
+    else if(Incoming_value == '4') turnRight();
+    else if(Incoming_value == '5') stop();
+    else if(Incoming_value == '6') boost();
+  }                            
+} 
+
+///////////function content/////////////
+void setup() {
+  Serial.begin(9600);            
+
+  // motor driver //
+  pinMode(EnA, OUTPUT);
+  pinMode(EnB, OUTPUT);
+  pinMode(In1, OUTPUT);
+  pinMode(In2, OUTPUT);
+  pinMode(In3, OUTPUT);
+  pinMode(In4, OUTPUT);
+}
+
+void forward(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 100);   
+  analogWrite(EnB, 100);   
+}
+
+void turnRight(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, HIGH);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 100);
+  analogWrite(EnB, 100);
+}
+
+void turnLeft(){
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, HIGH);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 100);
+  analogWrite(EnB, 100);
+}
+
+void backward(){
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, HIGH);
+  digitalWrite(In3, HIGH);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 100);   
+  analogWrite(EnB, 100);   
+}
+
+void stop(){
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 0);
+  analogWrite(EnB, 0);
+}
+
+void boost(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 200);   
+  analogWrite(EnB, 200);   
+}
+
