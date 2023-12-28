@@ -1,0 +1,146 @@
+#include <LiquidCrystal.h>
+#include "NewPing.h"
+
+#define TRIGGER_PIN 42
+#define ECHO_PIN 44
+const int trigPin = 42;
+const int echoPin=44;
+
+long duration;
+int distance;
+const int obstacleDistance = 25;
+
+int EnA = 12;
+int EnB = 11;
+
+int In2 = 52;
+int In1 = 26;
+int In4 = 36;
+int In3 = 32;
+
+int IR1 = 49; 
+int IR2 = 45;  
+
+#define MAX_DISTANCE 400  
+
+NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
+
+====================
+void setup();
+void forward();
+void turnRight();
+void turnLeft();
+void stop();
+void boost();
+====================
+
+void loop() {
+  // Write a pulse to the HC-SR04 Trigger Pin
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH);
+  
+  distance= duration*0.034/2;
+
+  if (distance > obstacleDistance || distance == 0){  //enters 'if' block statement if detects no obstacle in front, initiate line following
+    if (digitalRead(IR1)==LOW && digitalRead(IR2)==LOW){  
+    
+      stop();
+    }
+
+    else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==HIGH){
+     
+      boost();
+      delay(6);
+      forward();
+    }
+
+    else if (digitalRead(IR1)==HIGH && digitalRead(IR2)==LOW){
+      
+      turnRight();
+      delay(50);
+    }
+
+    else if (digitalRead(IR1)==LOW && digitalRead(IR2)==HIGH){
+      
+      turnLeft();
+      delay(50);
+    }
+  }
+
+  else{ //enters 'else' block statement if detects obstacles, robot car halts
+    stop();
+  }
+
+}
+
+void forward(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 55);   
+  analogWrite(EnB, 55);  
+}
+
+void turnRight(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, HIGH);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 200);
+  analogWrite(EnB, 200);
+}
+
+void turnLeft(){
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, HIGH);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 200);
+  analogWrite(EnB, 200);
+}
+
+void stop(){
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, LOW);
+  analogWrite(EnA, 0);
+  analogWrite(EnB, 0);
+}
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(trigPin,OUTPUT);
+  pinMode(echoPin,INPUT);
+
+  pinMode(EnA, OUTPUT);
+  pinMode(EnB, OUTPUT); 
+
+  pinMode(In1, OUTPUT);
+  pinMode(In2, OUTPUT);
+  pinMode(In3, OUTPUT);
+  pinMode(In4, OUTPUT);
+
+  pinMode(IR1, INPUT);
+  pinMode(IR2, INPUT);
+
+  lcd.begin(16,2);
+}
+
+void boost(){
+  digitalWrite(In1, HIGH);
+  digitalWrite(In2, LOW);
+  digitalWrite(In3, LOW);
+  digitalWrite(In4, HIGH);
+  analogWrite(EnA, 165);   
+  analogWrite(EnB, 165);   
+}
+  
+
+
